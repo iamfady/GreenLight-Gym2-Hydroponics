@@ -1,0 +1,64 @@
+TomatoEnv:
+  n_envs: 8
+  total_timesteps: 2_000_000
+  policy: MlpLstmPolicy # Policy for LSTM network
+  n_steps: 2048         # we update after n_steps calls of step() function. in the case of N envs --> N * n_steps
+  batch_size: 512
+  n_epochs: 8
+  gamma: 0.9631
+  gae_lambda: 0.9666
+  clip_range: 0.2
+  normalize_advantage: True
+  ent_coef: 0.00006002718320795429
+  vf_coef: 0.2599
+  max_grad_norm: 0.3
+  use_sde: False
+  sde_sample_freq: 8
+  target_kl: null
+
+  policy_kwargs: {net_arch: {pi: [1024, 1024], vf: [128, 128]},
+                  optimizer_class: adam,
+                  optimizer_kwargs: {amsgrad: True},
+                  activation_fn: silu,
+                  log_std_init: np.log(1), # np.log(1) results in policy std of 1, where exp(log(0.5)) = 0.5, 
+                  lstm_hidden_size: 256,
+                  n_lstm_layers: 1,
+                  shared_lstm: False,            # We don't use a shared lstm for actor and critic
+                  enable_critic_lstm: True,     # We do use lstm for the critic
+          }
+
+  learning_rate: 0.0001161
+
+
+
+
+LettuceEnv:
+  n_envs: 8
+  total_timesteps: 1_500_000         # أقل شوية من الطماطم لأن دورة الخس أقصر
+  policy: MlpLstmPolicy              # نفس نوع البوليسي (شبكة LSTM)
+  n_steps: 1024                      # خطوات تحديث أقل
+  batch_size: 256                    # أصغر عشان يبقى التدريب أسرع
+  n_epochs: 8
+  gamma: 0.98                        # Discount factor أبسط
+  gae_lambda: 0.95                   # GAE مناسب للخس
+  clip_range: 0.2
+  normalize_advantage: True
+  ent_coef: 0.0001                   # أكبر شوية للتشجيع على الاستكشاف
+  vf_coef: 0.4                       # زيادة شوية لاهتمام الـ value function
+  max_grad_norm: 0.5
+  use_sde: False
+  sde_sample_freq: 8
+  target_kl: null
+
+  policy_kwargs: {net_arch: {pi: [512, 512], vf: [256, 256]},   # شبكة أبسط من الطماطم
+                  optimizer_class: adam,
+                  optimizer_kwargs: {amsgrad: True},
+                  activation_fn: relu,                          # بدل silu → relu
+                  log_std_init: np.log(0.5),                    # policy std أصغر
+                  lstm_hidden_size: 128,                        # LSTM أخف
+                  n_lstm_layers: 1,
+                  shared_lstm: False,
+                  enable_critic_lstm: True
+          }
+
+  learning_rate: 0.0003              # معدل تعلم أعلى شوية للتسريع

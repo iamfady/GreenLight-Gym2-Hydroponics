@@ -1,0 +1,101 @@
+TomatoEnv:              # educated guess based on Bayes optimisation...
+  total_timesteps: 2_000_000
+  n_envs: 8
+  policy: MlpPolicy
+  n_steps: 2048         # we update after n_steps calls of step() function. in the case of N envs --> N * n_steps
+  batch_size: 128
+  n_epochs: 8
+  gamma: 0.9631
+  gae_lambda: 0.9167
+  clip_range: 0.2
+  normalize_advantage: True
+  ent_coef: 0.05434
+  vf_coef: 0.8225
+  max_grad_norm: 0.3
+  use_sde: False
+  sde_sample_freq: 8
+  target_kl: null
+
+  policy_kwargs: {net_arch: {pi: [256, 256, 256], vf: [512, 512, 512]},
+                  optimizer_class: adam,
+                  optimizer_kwargs: {amsgrad: True},
+                  activation_fn: silu,
+                  log_std_init: np.log(1) # Results in policy standard deviation of 0.5 since exp(log(0.5)) = 0.5, where np.log(1) results in std of 1
+          }
+
+  learning_rate: 2.e-5
+
+LettuceEnv:              # educated guess based on Bayes optimisation...
+  total_timesteps: 500_000  # 2_000_000
+  n_envs: 8
+  policy: MlpPolicy
+  n_steps: 2048         # we update after n_steps calls of step() function. in the case of N envs --> N * n_steps
+  batch_size: 256 #128
+  n_epochs: 8
+  gamma: 0.97 #0.9631
+  gae_lambda: 0.9167
+  clip_range: 0.2
+  normalize_advantage: True
+  ent_coef: 0.01 #0.05434
+  vf_coef: 0.8225
+  max_grad_norm: 0.3
+  use_sde: False
+  sde_sample_freq: 8
+  target_kl: null
+
+  policy_kwargs: {net_arch: {pi: [512, 512, 512, 512], vf: [512, 512, 512, 512]},
+                  optimizer_class: adam,
+                  optimizer_kwargs: {amsgrad: True},
+                  activation_fn: silu,
+                  log_std_init: np.log(1) # Results in policy standard deviation of 0.5 since exp(log(0.5)) = 0.5, where np.log(1) results in std of 1
+          }
+
+  learning_rate: 1.e-4 #2.e-5
+
+HydroponicLettuceEnv:              # Advanced hydroponic lettuce environment
+  total_timesteps: 1_966_080        # Increased for complex hydroponic control
+  n_envs: 8
+  policy: MlpPolicy
+  n_steps: 2048                     # Standard PPO steps
+  batch_size: 256                   # Larger batch for stability
+  n_epochs: 8
+  gamma: 0.98                       # Higher discount for long-term hydroponic optimization
+  gae_lambda: 0.9167
+  clip_range: 0.2
+  normalize_advantage: True
+  ent_coef: 0.02                    # Slightly higher exploration for hydroponic control
+  vf_coef: 0.8225
+  max_grad_norm: 0.3
+  use_sde: False
+  sde_sample_freq: 8
+  target_kl: null
+
+  policy_kwargs: {net_arch: {pi: [512, 512, 512, 512, 256], vf: [512, 512, 512, 512, 256]},
+                  optimizer_class: adam,
+                  optimizer_kwargs: {amsgrad: True},
+                  activation_fn: silu,
+                  log_std_init: np.log(0.8) # Slightly lower std for more stable hydroponic control
+          }
+
+  learning_rate: 5.e-5              # Lower learning rate for stable hydroponic learning
+
+# إعدادات الهايبربارامترز لـ LettuceEnv،
+#  معدلة بناءً على دراسات حول التعلم المعزز للتحكم في بيوت الخس الزجاجية.
+#  اعتمدت التعديلات على قيم من أبحاث متخصصة،
+#  مثل تقليل عدد الخطوات الإجمالية إلى 500,000 (بدلاً من 2 مليون للطماطم، نظرًا لدورة نمو الخس الأقصر)،
+#  رفع حجم الدفعة batch_size إلى 256،
+#  تغيير معامل الخصم (gamma) إلى 0.97،
+#  معامل الإنتروبيا (ent_coef) إلى 0.01،
+#  وتعديل هيكل الشبكة العصبية إلى 4 طبقات بـ 512 عقدة لكل من الـ actor والـ critic لتحسين الأداء في بيئة الخس
+# باقي القيم بقيت مشابهة للتوافق مع إعدادات الطماطم،
+#  مع إمكانية تحسين إضافي عبر تجارب أو Bayes optimization.
+
+# إعدادات الهايبربارامترز لـ HydroponicLettuceEnv،
+#  مصممة خصيصاً للتحكم المتقدم في أنظمة الهيدروبونيك.
+#  تم تعديل القيم بناءً على تعقيد التحكم في pH و EC والمغذيات:
+#  - زيادة عدد الخطوات الإجمالية إلى 1,000,000 للتعلم المعقد
+#  - رفع معامل الخصم إلى 0.98 للتحكم طويل المدى
+#  - زيادة معامل الإنتروبيا إلى 0.02 لاستكشاف أفضل
+#  - إضافة طبقة خامسة للشبكة العصبية (512, 512, 512, 512, 256)
+#  - خفض معدل التعلم إلى 5.e-5 للاستقرار
+#  - تقليل الانحراف المعياري الأولي إلى 0.8 للتحكم المستقر
