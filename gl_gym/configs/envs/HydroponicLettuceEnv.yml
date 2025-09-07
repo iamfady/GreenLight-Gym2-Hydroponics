@@ -27,7 +27,9 @@ GreenLightEnv:
 
 HydroponicLettuceEnv:
   base: GreenLightEnv             # يرث من البيئة الأساسية
-  reward_function: GreenhouseReward
+  reward_function: 
+    - GreenhouseReward
+    - reward_params
 
   observation_modules: 
     - IndoorClimateObservations      # ملاحظات المناخ الداخلي
@@ -100,7 +102,7 @@ HydroponicLettuceEnv:
 
   hydroponic_params:
     # ✅ نوع النظام
-    system_type: "NFT"                 # تقنية الفيلم المغذي
+    system_type: "NFT"
     
     # ✅ الأهداف المثالية
     target_ph: 6.0                     # درجة الحموضة المثالية

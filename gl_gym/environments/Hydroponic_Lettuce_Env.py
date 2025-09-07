@@ -24,8 +24,8 @@ class HydroponicLettuceEnv(GreenLightEnv):
         base_env_params: Dict[str, Any] = None,    # إعدادات البيئة الأساسية (مناخ، تحكم …)
         uncertainty_scale: float = 0.0,            # مقياس عدم اليقين (noise في المحاكاة)
         base: Dict[str, Any] = None,               # *EDITED*
-
         hydroponic_params: Dict[str, Any] = None, # إعدادات خاصة بالهيدروبونيك (نظام NFT/DWC, حجم المحلول …)
+        
         ) -> None:
         
         # Set default values if not provided
@@ -77,11 +77,9 @@ class HydroponicLettuceEnv(GreenLightEnv):
             reward_params = {
                 
                 # ✅ التكاليف الأساسية يومي/زمني ثابت.
-            
-                
+
                 "fixed_greenhouse_cost": 847.89,      # تكلفة ثابتة للصوبه [EGP]
                 #Rent / land value , Maintenance , Basic employment ,Services (water, management).
-
 
                 "fixed_co2_cost": 0.85 ,              # تكلفة CO2 ثابتة [EGP]
                 "fixed_lamp_cost":3.96,               # تكلفة الإضاءة [EGP]
@@ -107,7 +105,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
                 "solution_temp_violation_penalty": 0.1  # عقوبة انتهاك درجة حرارة المحلول
                 ################################################
                 ################################################
-                #               حط بقيت عقوبات الهيدروبونيك    #
+                #        حط بقيت عقوبات الهيدروبونيك           #
                 ################################################
                 ################################################
             }
@@ -141,7 +139,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
             hydroponic_params = {
             
                 # ✅ نوع النظام
-                "system_type": "NFT", # "NFT" or "DWC"  or "Aeroponics"  # Nutrient Film Technique
+                "system_type": "NFT", # "NFT" or "DWC"  or "Aeroponics"  # Nutrient Technique
             
                 # ✅ الأهداف المثالية
                 "target_ph": 6.0,      # Optimal pH for lettuce
@@ -164,6 +162,11 @@ class HydroponicLettuceEnv(GreenLightEnv):
                 "recirculation": True,      # Enable nutrient recirculation
                 "ph_control": True,         # Enable pH control
                 "ec_control": True,         # Enable EC control
+                ################################################
+                ################################################
+                #            Need Function to use              #
+                ################################################
+                ################################################
                 
 
 
@@ -256,6 +259,12 @@ class HydroponicLettuceEnv(GreenLightEnv):
             "Cu_control": 0.0,      # Copper concentration adjustment (0-1)
             "B_control": 0.0,       # Boron concentration adjustment (0-1)
             "Mo_control": 0.0,      # Molybdenum concentration adjustment (0-1)
+                ################################################
+                ################################################
+                #                مراجعه بقيه الكنترولرز        #
+                ################################################
+                ################################################
+
             
 
             }
@@ -265,8 +274,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
         # 🟢 store all hydroponic parameters
         self.hydroponic_params = hydroponic_params
 
-        # 🟢 init nutrient states
-        
+        # 🟢 init nutrient states        
         self.macronutrients = hydroponic_params.get(
             "macronutrients",
             {"N": 0, "P": 0, "K": 0, "Ca": 0, "Mg": 0, "S": 0}  # default values
@@ -277,7 +285,8 @@ class HydroponicLettuceEnv(GreenLightEnv):
             {"Fe": 0, "Mn": 0, "Zn": 0, "Cu": 0, "B": 0, "Mo": 0}
         ).copy()
         
-        # 🟢 Initialize solution temperature with a random value 
+        
+        # 🟢 Initialize solution temperature with a random value
     
         # between the defined minimum and maximum range.
         low  = hydroponic_params["solution_temp_min"]
@@ -287,7 +296,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
         # 🟢 Initialize hydroponic solution flow rate (L/min) from environment parameters
         self.flow_rate = hydroponic_params["nutrient_flow_rate"]
         
-        # 🟢 Initialize aeration rate (e.g., dissolved oxygen control / bubbling intensity)
+        # 🟢 Initialize aeration rate (dissolved oxygen control / bubbling intensity)
         self.aeration_rate = hydroponic_params["aeration_rate"]
 
         # 🟢 Initialize economic variables
@@ -309,6 +318,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
         # 🟢 Environmental and operational constraints (pH/EC ranges, temperature limits, CO₂ thresholds)
         self.constraints = constraints
 
+    
         # 🟢 Define observation space based on actual observation vector
         #    - Calls _get_observation() once to infer the correct shape
         #    - Uses unbounded Box (−∞ to +∞) since scaling/normalization can be handled separately
@@ -349,6 +359,11 @@ class HydroponicLettuceEnv(GreenLightEnv):
             constraints["ph_min"],
             constraints["ec_min"],
             constraints["solution_temp_min"]
+            ################################################
+            ################################################
+            #                بقيت الهيدروبونيك             #
+            ################################################
+            ################################################
         ]
 
         # Upper bounds (maximum allowed values for safe operation)
@@ -381,6 +396,11 @@ class HydroponicLettuceEnv(GreenLightEnv):
             # Assume pH and EC are already reserved in the state vector
             self.current_ph = 6.0
             self.current_ec = 1.4
+            ################################################
+            ################################################
+            #             Try Random VAlue.                #
+            ################################################
+            ################################################
         else:
             # Extend state vector to include pH and EC explicitly
             self.x = np.append(self.x, [6.0, 1.4])  
@@ -397,12 +417,22 @@ class HydroponicLettuceEnv(GreenLightEnv):
         self.oxygen_level = 8.0                # mg/L, typical DO concentration
         self.flow_rate = self.hydroponic_params.get("nutrient_flow_rate", 2.0)  
         self.aeration_rate = self.hydroponic_params.get("aeration_rate", 1.0)
+        ################################################
+        ################################################
+        #             Try Random VAlue.                #
+        ################################################
+        ################################################
         
     
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         # إعادة تهيئة الحالة الهيدروبونيك
         self._init_hydroponic_state()
-        self.days_passed = 0 
+        self.days_passed = 0
+        ################################################
+        ################################################
+        #             Change Day to Min                #
+        ################################################
+        ################################################
 
         # Reset controllers
         self.controllers = {k: 0.0 for k in self.controllers}
@@ -414,6 +444,11 @@ class HydroponicLettuceEnv(GreenLightEnv):
         info = {
             "episode": getattr(self, "episode", 0),
             "timestep": self.days_passed,
+            ################################################
+            ################################################
+            #             Change Day to Min                #
+            ################################################
+            ################################################
         }
 
         return obs, info
@@ -571,6 +606,11 @@ class HydroponicLettuceEnv(GreenLightEnv):
         return obs, reward, terminated, truncated, info
 
     def _update_hydroponic_state(self, action: np.ndarray) -> None:
+        ################################################
+        ################################################
+        #                بقيت الهيدروبونيك             #
+        ################################################
+        ################################################
         """Update hydroponic-specific state variables"""
         # Update pH and EC based on control actions
         if len(action) >= 8:
@@ -724,7 +764,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
     def _get_observation(self) -> np.ndarray:
         """
         Returns the current observation vector for the agent.
-        عدل ترتيب وقيم العناصر حسب ما يناسب حالتك!
+        Combines hydroponic state variables and controller settings.
         """
         # -------- Hydroponic state --------
         obs = [
@@ -772,6 +812,14 @@ class HydroponicLettuceEnv(GreenLightEnv):
         #   obs_names.extend(module.obs_names)
         return obs_names
 
+
+        
+        
+        ################################################
+        ################################################
+        #                محتاجه تتراجع                 #
+        ################################################
+        ################################################
     # ------------------------------
     #  Calculation functions (primary logic, customizable)
     #  ------------------------------
