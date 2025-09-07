@@ -1,0 +1,134 @@
+# Description: Configuration file for the Bleiswijk environment
+# Always define the general parameters for the base environment
+GreenLightEnv:
+  weather_data_dir: gl_gym/environments/weather # path to weather data
+  location: Amsterdam             # location of the recorded weather data
+  num_params: 208                 # number of model parameters
+  nx: 28                          # number of states
+  nu: 6                           # number of control inputs
+  nd: 10                          # number of weather disturbances
+  dt: 900                         # [s] time step for the underlying GreenLight solver
+  u_min: [0, 0, 0, 0, 0, 0]
+  u_max: [1, 1, 1, 1, 1, 1]
+  delta_u_max: 0.1                # max change rate in control inputs
+  pred_horizon: 0.5               # [days] number of future weather predictions
+  season_length: 60               # number of days to simulate
+  start_train_year: 2010          # start year for training
+  end_train_year: 2010            # end year for training
+  start_train_day: 59             # start day of the year for training
+  end_train_day: 59               # end day of the year for training  
+  training: True                  # whether we are training or testing
+
+TomatoEnv:
+  reward_function: GreenhouseReward       # reward function to use
+
+  observation_modules: [                  # observation modules to use
+    IndoorClimateObservations,   
+    BasicCropObservations, 
+    ControlObservations, 
+    WeatherObservations,
+    TimeObservations,
+    WeatherForecastObservations
+  ]
+
+  constraints:
+    co2_min: 300.         # lower bound on CO2 concentration                [ppm]        0
+    co2_max: 1600.        # upper bound on CO2 concentration              [ppm]        2.75e-3
+    temp_min: 15.         # lower bound on temperature                    [°C]         6.5
+    temp_max: 34.         # upper bound on temperature                    [°C]        20
+    rh_min: 50.            # lower bound on relative humidity             [#]          0
+    rh_max: 85.          # upper bound on relative humidity               [#]         70
+
+  eval_options:
+    eval_days: [59]                    # days to evaluate the agent on
+    eval_years: [2010]                  # year to evaluate the agent on
+    location: Amsterdam                 # location of the greenhouse
+
+  reward_params:
+    fixed_greenhouse_cost: 15.
+    fixed_co2_cost: 0.015
+    fixed_lamp_cost: 0.07       # in reality this is multiplied by the max used intensity of the lamps e.g., 200umol/m2/s (we do the same.)
+    fixed_screen_cost: 2.       # 1,- per screen
+    elec_price: 0.3             # €/kWh
+    heating_price: 0.09         # €/kWh
+    co2_price: 0.3              # €/kg
+    fruit_price: 1.6            # €/kg
+    dmfm: 0.065                 # dry matter fresh matter ratio
+    pen_weights: [4.e-4, 5.e-3, 7.e-4]
+    pen_lamp: 0.1
+
+# results_columns: [
+#   Time, co2_air, co2_top, temp_air, temp_top, can_temp, covin_temp, covex_temp,
+#   thScr_temp, flr_temp, pipe_temp, soil1_temp, soil2_temp, soil3_temp, soil4_temp, soil5_temp, 
+#   vp_air, vp_top, lamp_temp, intlamp_temp, grow_pipe_temp, blscr_temp, 24_can_temp,
+#   cBuf, cleaves, cstem, cFruit, tsum, glob_rad, temp_out, rh_out, co2_out, wind_speed,
+#   heating_setpoint, co2_setpoint, thr_scr, vent_setpoint, lamp,
+#   profits, cum_profits, cum_fixed_costs, cum_var_costs, cum_gains, episode
+#]
+
+
+
+'''
+weather_data_dir: مسار بيانات الطقس: "gl_gym/environments/weather" (مسار إلى بيانات الطقس المسجلة).
+location: الموقع: أمستردام (موقع بيانات الطقس المسجلة).
+num_params: عدد البارامترات: 208 (عدد بارامترات النموذج).
+nx: عدد الحالات (states): 28.
+nu: عدد المدخلات التحكمية (control inputs): 6.
+nd: عدد التشويشات الجوية (weather disturbances): 10.
+dt: خطوة الزمن: 900 ثانية (للحل الداخلي للنموذج GreenLight).
+u_min: الحد الأدنى للمدخلات التحكمية: [0, 0, 0, 0, 0, 0].
+u_max: الحد الأعلى للمدخلات التحكمية: [1, 1, 1, 1, 1, 1].
+delta_u_max: الحد الأقصى لمعدل التغيير في المدخلات التحكمية: 0.1.
+pred_horizon: أفق التنبؤ: 0.5 يوم (عدد أيام التنبؤات الجوية المستقبلية).
+season_length: طول الموسم: 60 يوم (عدد الأيام للمحاكاة).
+start_train_year: سنة بداية التدريب: 2010.
+end_train_year: سنة نهاية التدريب: 2010.
+start_train_day: يوم بداية التدريب: 59 (يوم من السنة).
+end_train_day: يوم نهاية التدريب: 59.
+training: وضع التدريب: صحيح (True) (ما إذا كان النظام في وضع التدريب أو الاختبار).
+
+إعدادات محيط الطماطم (TomatoEnv):
+
+reward_function: دالة المكافأة: GreenhouseReward (دالة المكافأة المستخدمة).
+observation_modules: وحدات الملاحظات (observation modules): قائمة تشمل:
+
+IndoorClimateObservations (ملاحظات المناخ الداخلي).
+BasicCropObservations (ملاحظات المحصول الأساسية).
+ControlObservations (ملاحظات التحكم).
+WeatherObservations (ملاحظات الطقس).
+TimeObservations (ملاحظات الوقت).
+WeatherForecastObservations (ملاحظات تنبؤات الطقس).
+
+
+constraints: القيود:
+
+co2_min: الحد الأدنى لتركيز ثاني أكسيد الكربون: 300 جزء في المليون (ppm).
+co2_max: الحد الأعلى لتركيز ثاني أكسيد الكربون: 1600 جزء في المليون.
+temp_min: الحد الأدنى لدرجة الحرارة: 15 درجة مئوية.
+temp_max: الحد الأعلى لدرجة الحرارة: 34 درجة مئوية.
+rh_min: الحد الأدنى للرطوبة النسبية: 50%.
+rh_max: الحد الأعلى للرطوبة النسبية: 85%.
+
+
+eval_options: خيارات التقييم:
+
+eval_days: أيام التقييم: [59] (أيام لتقييم الوكيل).
+eval_years: سنوات التقييم: [2010].
+location: الموقع: أمستردام.
+
+
+reward_params: بارامترات المكافأة:
+
+fixed_greenhouse_cost: تكلفة ثابتة للبيت الزجاجي: 15 يورو.
+fixed_co2_cost: تكلفة ثابتة لثاني أكسيد الكربون: 0.015 يورو.
+fixed_lamp_cost: تكلفة ثابتة للمصابيح: 0.07 يورو (تُضرب في شدة الإضاءة القصوى المستخدمة، مثل 200 ميكرومول/م²/ثانية).
+fixed_screen_cost: تكلفة ثابتة للشاشات: 2 يورو (لكل شاشة).
+elec_price: سعر الكهرباء: 0.3 يورو/كيلووات ساعة.
+heating_price: سعر التدفئة: 0.09 يورو/كيلووات ساعة.
+co2_price: سعر ثاني أكسيد الكربون: 0.3 يورو/كيلوغرام.
+fruit_price: سعر الثمار: 1.6 يورو/كيلوغرام.
+dmfm: نسبة المادة الجافة إلى المادة الطازجة: 0.065.
+pen_weights: أوزان العقوبات: [4.e-4, 5.e-3, 7.e-4].
+pen_lamp: عقوبة المصابيح: 0.1.
+
+'''

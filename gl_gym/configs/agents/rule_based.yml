@@ -1,0 +1,103 @@
+TomatoEnv:
+  lamps_on: 0
+  lamps_off: 18
+  lamps_day_start: -1
+  lamps_day_stop: 366
+  lamps_off_sun: 400
+  lamp_rad_sum_limit: 10
+  temp_setpoint_day: 19.5
+  temp_setpoint_night: 16.5
+  heat_correction: 0
+  heat_deadzone: 5
+  co2_day: 800
+  vent_heat_Pband: 4
+  rh_max: 85
+  mech_dehumid_Pband: 2
+  vent_rh_Pband: 5
+  t_vent_off: 1
+  vent_cold_Pband: -1
+  thScrSpDay: 5
+  thScrSpNight: 10
+  thScrPband: -1
+  thScrDeadZone: 4
+  thScrRh: -2
+  thScrRhPband: 2
+  lampExtraHeat: 2
+  blScrExtraRh: 100
+  rhMax: 85
+  tHeatBand: -1
+  co2Band: -100
+  useBlScr: 1
+
+
+
+
+# LettuceEnv:
+#   lamps_on: 0
+#   lamps_off: 16                # ساعات إضاءة أقل (16 ساعة كفاية للخس)
+#   lamps_day_start: -1
+#   lamps_day_stop: 366
+#   lamps_off_sun: 300           # ضوء شمسي أقل
+#   lamp_rad_sum_limit: 8        # أقل عشان الخس حساس للإجهاد الضوئي
+#   temp_setpoint_day: 18.0      # حرارة نهار أقل من الطماطم
+#   temp_setpoint_night: 15.0    # حرارة ليل أقل
+#   heat_correction: 0
+#   heat_deadzone: 4
+#   co2_day: 600                 # CO₂ أقل من الطماطم
+#   vent_heat_Pband: 3
+#   rh_max: 90                   # الخس يستحمل رطوبة أعلى
+#   mech_dehumid_Pband: 2
+#   vent_rh_Pband: 5
+#   t_vent_off: 1
+#   vent_cold_Pband: -1
+#   thScrSpDay: 5
+#   thScrSpNight: 10
+#   thScrPband: -1
+#   thScrDeadZone: 4
+#   thScrRh: -2
+#   thScrRhPband: 2
+#   lampExtraHeat: 2
+#   blScrExtraRh: 100
+#   rhMax: 90
+#   tHeatBand: -1
+#   co2Band: -100
+#   useBlScr: 1
+
+
+LettuceEnv:
+  n_envs: 1
+  total_timesteps: 10000    # أي رقم placeholder يكفي مع rule_based
+  n_steps: 2048             # قيم قياسية (مهمة لو هتجرب PPO بعدين)
+  batch_size: 64
+  n_epochs: 5
+  gamma: 0.99
+
+  lamps_on: 0
+  lamps_off: 16
+  lamps_day_start: -1
+  lamps_day_stop: 366
+  lamps_off_sun: 300
+  lamp_rad_sum_limit: 8
+  temp_setpoint_day: 18.0
+  temp_setpoint_night: 15.0
+  heat_correction: 0
+  heat_deadzone: 4
+  co2_day: 600
+  vent_heat_Pband: 3
+  rh_max: 90
+  mech_dehumid_Pband: 2
+  vent_rh_Pband: 5
+  t_vent_off: 1
+  vent_cold_Pband: -1
+  thScrSpDay: 5
+  thScrSpNight: 10
+  thScrPband: -1
+  thScrDeadZone: 4
+  thScrRh: -2
+  thScrRhPband: 2
+  lampExtraHeat: 2
+  blScrExtraRh: 100
+  rhMax: 90
+  tHeatBand: -1
+  co2Band: -100
+  useBlScr: 1
