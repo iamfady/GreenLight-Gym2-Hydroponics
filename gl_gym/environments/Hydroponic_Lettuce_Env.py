@@ -225,6 +225,9 @@ class HydroponicLettuceEnv(GreenLightEnv):
 
         self.biomass = 0.1  # Initial biomass value
         self.timesteps_passed = 0  # Initial timestep value # 🟢 controllers
+
+        # ⏱️ Define time step (default = 1 hour)
+        self.time_step = 3600
        
         self.controllers = {
             # Climate Controllers
@@ -291,7 +294,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
         # between the defined minimum and maximum range.
         low  = hydroponic_params["solution_temp_min"]
         high = hydroponic_params["solution_temp_max"]
-        self.solution_temperature = np.random.uniform(low, high)
+        self.solution_temp = np.random.uniform(low, high)
 
         # 🟢 Initialize hydroponic solution flow rate (L/min) from environment parameters
         self.flow_rate = hydroponic_params["nutrient_flow_rate"]
@@ -413,7 +416,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
         self.micronutrients = self.hydroponic_params.get("micronutrients", {}).copy()
 
         # 🟢 Initialize hydroponic environment conditions
-        self.solution_temperature = 21.0       # °C, default initial solution temp
+        self.solution_temp = 21.0       # °C, default initial solution temp
         self.oxygen_level = 8.0                # mg/L, typical DO concentration
         self.flow_rate = self.hydroponic_params.get("nutrient_flow_rate", 2.0)  
         self.aeration_rate = self.hydroponic_params.get("aeration_rate", 1.0)
@@ -425,33 +428,66 @@ class HydroponicLettuceEnv(GreenLightEnv):
         
     
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
-        # إعادة تهيئة الحالة الهيدروبونيك
+        # 🟢 عمل seeding لو اتبعت من SB3 أو make_vec_env
+        if seed is not None:
+            np.random.seed(seed)
+
+        # 🟢 Reset counters
+        self.current_step = 0            # عدد الـ timesteps
+        self.sim_time_seconds = 0        # الوقت الفعلي بالثواني
+        self.days_passed = 0             # عدد الأيام
+        self.timesteps_passed = 0        # alias للـ logger
+        self.episode += 1                # عداد الـ episodes
+
+        # default: 1 hour per step
+        self.time_step = options.get("time_step", 3600) if options else 3600
+
+        # 🟢 إعادة تهيئة الحالة الهيدروبونيك
         self._init_hydroponic_state()
-        self.days_passed = 0
-        ################################################
-        ################################################
-        #             Change Day to Min                #
-        ################################################
-        ################################################
 
-        # Reset controllers
-        self.controllers = {k: 0.0 for k in self.controllers}
+        # 🟢 Reset biomass and cumulative costs
+        self.biomass = 0.1
+        self.revenue = 0.0
+        self.heat_costs = 0.0
+        self.co2_costs = 0.0
+        self.elec_costs = 0.0
+        self.irrigation_volume = 0.0
+        self.nutrient_costs = 0.0
+        self.water_costs = 0.0
+        self.pump_energy_costs = 0.0
 
-        # نجيب الـ observation
+        # 🟢 Reset nutrient levels (defaults if مش موجودة في hydroponic_params)
+        self.macronutrients = self.hydroponic_params.get("macronutrients", {
+            "N": 100.0, "P": 30.0, "K": 150.0, "Ca": 80.0, "Mg": 40.0, "S": 20.0
+        }).copy()
+        self.micronutrients = self.hydroponic_params.get("micronutrients", {
+            "Fe": 2.0, "Mn": 0.5, "Zn": 0.05, "Cu": 0.05, "B": 0.3, "Mo": 0.05
+        }).copy()
+
+        # 🟢 Reset controllers
+        if hasattr(self, "controllers") and isinstance(self.controllers, dict):
+            self.controllers = {k: 0.0 for k in self.controllers}
+        else:
+            self.controllers = {}
+
+        # 🟢 Reset solution parameters
+        self.solution_temp = np.random.uniform(18.0, 22.0)
+        self.current_ph = np.random.uniform(5.5, 6.5)
+        self.current_ec = np.random.uniform(1.5, 2.5)
+
+        # 🟢 نجيب الـ observation
         obs = self._get_observation()
 
-        # ممكن نحط info أساسي زي بداية الـ episode
+        # 🟢 Basic info dictionary
         info = {
-            "episode": getattr(self, "episode", 0),
-            "timestep": self.days_passed,
-            ################################################
-            ################################################
-            #             Change Day to Min                #
-            ################################################
-            ################################################
+            "episode": self.episode,
+            "timestep": self.timesteps_passed,
+            "day": self.days_passed,
+            "sim_time_seconds": self.sim_time_seconds
         }
 
         return obs, info
+
 
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, SupportsFloat, bool, bool, Dict[str, Any]]:
@@ -459,8 +495,22 @@ class HydroponicLettuceEnv(GreenLightEnv):
 
         # -------- Internal Status Update --------
         self._update_hydroponic_state(action)   # تحديث dynamics (محاكاة تأثير الأوامر)
-        self.days_passed +=  1                   # advance simulation clock by 1 day (or timestep)
+        
+        # 🟢  Update counters
+        self.current_step += 1
+        self.sim_time_seconds = self.current_step * self.time_step
+        self.days_passed = self.sim_time_seconds // (24 * 3600)
+        self.timesteps_passed = self.current_step
 
+        # 🕒 ساعات ودقايق (لو هتحتاجهم في التكاليف)
+        hour_of_day = (self.sim_time_seconds // 3600) % 24
+        minute_of_hour = (self.sim_time_seconds // 60) % 60
+
+        # تقدر تخزنهم عشان الـ obs أو info
+        self.hour_of_day = int(hour_of_day)
+        self.minute_of_hour = int(minute_of_hour)
+
+            
         # -------- تحديث الكنترولرز من الـ action --------
         # Controllers directly mapped from RL action vector
         self.controllers.update({
@@ -509,7 +559,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
             "current_ec": float(self.current_ec),
             "solution_ph": self.current_ph,
             "solution_ec": self.current_ec,
-            "solution_temperature": self.solution_temperature,
+            "solution_temp": self.solution_temp,
             "oxygen_level": self.oxygen_level,
             "flow_rate": self.flow_rate,
             "aeration_rate": self.aeration_rate,
@@ -606,49 +656,61 @@ class HydroponicLettuceEnv(GreenLightEnv):
         return obs, reward, terminated, truncated, info
 
     def _update_hydroponic_state(self, action: np.ndarray) -> None:
-        ################################################
-        ################################################
-        #                بقيت الهيدروبونيك             #
-        ################################################
-        ################################################
         """Update hydroponic-specific state variables"""
         # Update pH and EC based on control actions
         if len(action) >= 8:
-            # pH control (action[6])
-            ph_change = action[6] * 0.1  # pH change per step
-            self.current_ph = np.clip(self.current_ph + ph_change, 5.0, 7.0)
-            
-            # EC control (action[7])
-            ec_change = action[7] * 0.1  # EC change per step
-            self.current_ec = np.clip(self.current_ec + ec_change, 0.5, 3.0)
-        
-        # Update solution temperature based on environmental conditions
+            # =====================
+            # pH dynamics
+            # =====================
+            buffer_capacity = 5.0
+            ph_change = (action[6] * 0.1) / buffer_capacity
+            root_effect = -0.0005 * self.biomass  # roots acidify slightly
+            self.current_ph = np.clip(
+                self.current_ph + ph_change + root_effect, 5.0, 7.0
+            )
+
+            # =====================
+            # EC dynamics
+            # =====================
+            ec_increase = action[7] * 0.05
+            uptake_effect = -0.0002 * self.biomass
+            dilution_effect = -0.0001 * self.irrigation_volume
+            self.current_ec = np.clip(
+                self.current_ec + ec_increase + uptake_effect + dilution_effect,
+                0.5, 3.0
+            )
+
+        # =====================
+        # Solution temperature
+        # =====================
         if hasattr(self, 'x') and len(self.x) >= 2:
             air_temp = self.x[2]  # Air temperature
-            # Solution temperature follows air temperature with some lag
-            temp_diff = air_temp - self.solution_temperature
-            self.solution_temperature += temp_diff * 0.01
-        
-        ########################################
-        # Update oxygen level based on aeration
-        # self._update_oxygen_level()
-        ########################################
+            temp_diff = air_temp - self.solution_temp
+            self.solution_temp += temp_diff * 0.01  
 
-        # Update nutrient levels (simplified model)
+            # Effect of solution temperature on EC
+            temp_effect = 0.001 * (self.solution_temp - 20.0)
+            self.current_ec = np.clip(
+                self.current_ec * (1 + temp_effect), 0.5, 3.0
+            )
+
+        self._update_oxygen_level()
+        # ===========================
+        # Nutrient uptake
+        # ===========================
         self._update_macronutrients()
-
         self._update_micronutrients()
+
         
     def _update_macronutrients(self) -> None:
         """
         Update macronutrient levels (N, P, K, Ca, Mg, S) based on plant uptake.
-        
-        Improved model:
-        - Uptake rate scales with biomass (larger plant → higher uptake).
-        - Each macronutrient has its own relative uptake coefficient.
-        - Values are prevented from going below zero.
+
+        Improvements:
+        - Uptake scales with biomass.
+        - Availability depends on EC and pH.
+        - Uptake decreases if nutrient concentration is low.
         """
-        # Relative uptake coefficients (g/step per unit biomass)
         uptake_coeffs = {
             "N": 0.002,
             "P": 0.001,
@@ -658,21 +720,32 @@ class HydroponicLettuceEnv(GreenLightEnv):
             "S": 0.0007,
         }
 
+        # Nutrient availability factor based on EC and pH
+        ec_factor = np.clip((self.current_ec - 0.5) / (2.5), 0.0, 1.0)  # 0.5–3.0 range
+        ph_factor = np.exp(-0.5 * ((self.current_ph - 6.0) / 0.5) ** 2)  # Gaussian around 6.0
+
+        availability = ec_factor * ph_factor
+
         for nutrient, coeff in uptake_coeffs.items():
             if nutrient in self.macronutrients:
-                uptake = coeff * self.biomass
-                if self.macronutrients[nutrient] > 0:
-                    self.macronutrients[nutrient] -= uptake
-                    self.macronutrients[nutrient] = max(0, self.macronutrients[nutrient])
+                base_uptake = coeff * self.biomass * availability
+                # Scale uptake if nutrient pool is small
+                max_possible = self.macronutrients[nutrient] * 0.1
+                uptake = min(base_uptake, max_possible)
+
+                self.macronutrients[nutrient] = max(
+                    0, self.macronutrients[nutrient] - uptake
+                )
+
 
     def _update_micronutrients(self) -> None:
         """
         Update micronutrient levels (Fe, Mn, Zn, Cu, B, Mo) based on plant uptake.
 
-        Improved model:
-        - Uptake scales with biomass (larger plants → more consumption).
-        - Each micronutrient has its own uptake coefficient (trace amounts).
-        - Ensures values do not drop below zero.
+        Improvements:
+        - Uptake scales with biomass.
+        - Availability depends on EC and especially pH.
+        - Trace elements strongly limited outside 5.5–6.5.
         """
         uptake_coeffs = {
             "Fe": 0.00012,
@@ -683,42 +756,61 @@ class HydroponicLettuceEnv(GreenLightEnv):
             "Mo": 0.00003,
         }
 
+        # Micronutrient uptake more sensitive to pH
+        ec_factor = np.clip((self.current_ec - 0.5) / (2.5), 0.0, 1.0)
+        ph_factor = np.exp(-0.5 * ((self.current_ph - 6.0) / 0.3) ** 2)  # narrower Gaussian
+
+        availability = ec_factor * ph_factor
+
         for nutrient, coeff in uptake_coeffs.items():
             if nutrient in self.micronutrients:
-                uptake = coeff * self.biomass
-                if self.micronutrients[nutrient] > 0:
-                    self.micronutrients[nutrient] -= uptake
-                    self.micronutrients[nutrient] = max(0, self.micronutrients[nutrient])
+                base_uptake = coeff * self.biomass * availability
+                # Limit uptake if pool is very low
+                max_possible = self.micronutrients[nutrient] * 0.1
+                uptake = min(base_uptake, max_possible)
+
+                self.micronutrients[nutrient] = max(
+                    0, self.micronutrients[nutrient] - uptake
+                )
 
 
-    # def _update_oxygen_level(self) -> None:
-    #     """
-    #     Update dissolved oxygen (DO) level in the nutrient solution.
 
-    #     Advanced model:
-    #     - Oxygen decreases due to plant/root respiration (scaled by biomass).
-    #     - Oxygen increases from aeration_rate and flow_rate.
-    #     - Values are clamped within safe physiological range (4–12 mg/L).
-    #     """
-    #     # Plant oxygen consumption (proportional to biomass)
-    #     base_consumption = 0.005      # baseline consumption per step (mg/L)
-    #     biomass_factor = 0.0005       # extra consumption per unit biomass
-    #     consumption_rate = base_consumption + biomass_factor * self.biomass
+    def _update_oxygen_level(self) -> None:
+        """
+        Update dissolved oxygen (DO) in the nutrient solution.
 
-    #     # Oxygen addition from aeration
-    #     aeration_efficiency = 0.1     # mg/L per unit aeration_rate
-    #     oxygen_from_aeration = self.aeration_rate * aeration_efficiency
+        Model:
+        - Oxygen decreases due to plant/root respiration (scaled by biomass).
+        - Oxygen increases from aeration and flow controllers.
+        - Oxygen cannot exceed temperature-dependent saturation.
+        - Values are clamped within physiological safe range (4–12 mg/L).
+        """
+        # --- Saturation limit from solution temperature ---
+        temp = self.solution_temp
+        sat_oxygen = max(6.0, 10.0 - 0.2 * (temp - 15))  # ~10 mg/L at 15°C, ~6 mg/L at 30°C
 
-    #     # Oxygen addition from flow (mixing improves oxygen availability)
-    #     flow_efficiency = 0.05        # mg/L per unit flow_rate
-    #     oxygen_from_flow = self.flow_rate * flow_efficiency
+        # --- Plant oxygen consumption ---
+        base_consumption = 0.005      # baseline consumption per step (mg/L)
+        biomass_factor = 0.0005       # extra consumption per unit biomass
+        consumption_rate = base_consumption + biomass_factor * self.biomass
 
-    #     # Net update
-    #     self.oxygen_level = np.clip(
-    #         self.oxygen_level - consumption_rate + oxygen_from_aeration + oxygen_from_flow,
-    #         self.constraints.get("oxygen_min", 4.0),
-    #         self.constraints.get("oxygen_max", 12.0)
-    #     )
+        # --- Oxygen addition from controllers ---
+        aeration_efficiency = 0.1     # mg/L per unit aeration
+        flow_efficiency = 0.05        # mg/L per unit flow
+
+        aeration_rate = self.controllers.get("aeration_control", 0.0)
+        flow_rate = self.controllers.get("flow_control", 0.0)
+
+        oxygen_from_aeration = aeration_rate * aeration_efficiency
+        oxygen_from_flow = flow_rate * flow_efficiency
+
+        # --- Net update ---
+        self.oxygen_level = np.clip(
+            self.oxygen_level - consumption_rate + oxygen_from_aeration + oxygen_from_flow,
+            self.constraints.get("oxygen_min", 4.0),
+            min(sat_oxygen, self.constraints.get("oxygen_max", 12.0))
+        )
+
 
 
     def _get_hydroponic_info(self) -> Dict[str, Any]:
@@ -726,7 +818,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
         info = {
             "current_ph": self.current_ph,
             "current_ec": self.current_ec,
-            "solution_temperature": self.solution_temperature,
+            "solution_temp": self.solution_temp,
             "oxygen_level": self.oxygen_level,
             "macronutrients": self.macronutrients,
             "micronutrients": self.micronutrients,
@@ -741,7 +833,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
 
             # انتهاكات المناخ والهيدروبونيك
             "lamp_violation": self._check_lamp_violation(),
-            "temp_violation": self.solution_temperature > self.constraints.get("solution_temp_max", 24.0),
+            "temp_violation": self.solution_temp > self.constraints.get("solution_temp_max", 24.0),
             "co2_violation": self._check_co2_violation(),
             "rh_violation": self._check_rh_violation(),
 
@@ -763,32 +855,32 @@ class HydroponicLettuceEnv(GreenLightEnv):
 
     def _get_observation(self) -> np.ndarray:
         """
-        Returns the current observation vector for the agent.
-        Combines hydroponic state variables and controller settings.
+        Compact observation vector for RL training.
+        Focus on essential hydroponic states and summarized nutrient info.
         """
-        # -------- Hydroponic state --------
+        # --- Core hydroponic state ---
         obs = [
-            self.current_ph,
-            self.current_ec,
-            self.solution_temperature,
-            self.oxygen_level,
-            self.flow_rate,
-            self.aeration_rate,
+            self.current_ph,        # الحموضة
+            self.current_ec,        # الملوحة / الأملاح الكلية
+            self.solution_temp,     # حرارة المحلول
+            self.oxygen_level,      # الأكسجين الذائب
         ]
-        #  عناصر غذائية أساسية
-        obs += [self.macronutrients.get(n, 0.0) for n in ["N", "P", "K", "Ca", "Mg", "S"]]
-        # عناصر غذائية دقيقة
-        obs += [self.micronutrients.get(m, 0.0) for m in ["Fe", "Mn", "Zn", "Cu", "B", "Mo"]]
-        
-        # -------- Controllers --------
-        controller_order = [
-        "lamp", "ventilation", "co2_dosing", "screen", "heating", "irrigation",
-        "ph_control", "ec_control",
-        "N_control", "P_control", "K_control", "Ca_control", "Mg_control", "S_control",
-        "Fe_control", "Mn_control", "Zn_control", "Cu_control", "B_control", "Mo_control",
-        "solution_temp_control", "flow_rate_control", "aeration_control"
-    ]
-        obs += [self.controllers.get(c, 0.0) for c in controller_order]
+
+        # --- Simplified nutrient status ---
+        total_macro = sum(self.macronutrients.values())
+        total_micro = sum(self.micronutrients.values())
+
+        # Ratios for balance between NPK (أهم عناصر النمو)
+        n_ratio = self.macronutrients.get("N", 0.0) / (total_macro + 1e-6)
+        p_ratio = self.macronutrients.get("P", 0.0) / (total_macro + 1e-6)
+        k_ratio = self.macronutrients.get("K", 0.0) / (total_macro + 1e-6)
+
+        obs += [total_macro, total_micro, n_ratio, p_ratio, k_ratio]
+
+        # --- Environmental conditions (لو عايز تضيف) ---
+        obs.append(getattr(self, "air_temp", 22.0))   # حرارة الهواء
+        obs.append(getattr(self, "humidity", 60.0))   # الرطوبة
+        obs.append(getattr(self, "co2_level", 400.0)) # تركيز CO₂
 
         return np.array(obs, dtype=np.float32)
 
@@ -797,16 +889,24 @@ class HydroponicLettuceEnv(GreenLightEnv):
         """
         obs_names = [
         # Hydroponic state
-        "current_ph", "current_ec", "solution_temperature", "oxygen_level", "flow_rate", "aeration_rate",
-        "N", "P", "K", "Ca", "Mg", "S",
-        "Fe", "Mn", "Zn", "Cu", "B", "Mo",
+        # "current_ph", "current_ec", "solution_temp", "oxygen_level", "flow_rate", "aeration_rate",
+        # "N", "P", "K", "Ca", "Mg", "S",
+        # "Fe", "Mn", "Zn", "Cu", "B", "Mo",
         
-        # Controllers
-        "lamp", "ventilation", "co2_dosing", "screen", "heating", "irrigation",
-        "ph_control", "ec_control",
-        "N_control", "P_control", "K_control", "Ca_control", "Mg_control", "S_control",
-        "Fe_control", "Mn_control", "Zn_control", "Cu_control", "B_control", "Mo_control",
-        "solution_temp_control", "flow_rate_control", "aeration_control"
+        # # Controllers
+        # "lamp", "ventilation", "co2_dosing", "screen", "heating", "irrigation",
+        # "ph_control", "ec_control",
+        # "N_control", "P_control", "K_control", "Ca_control", "Mg_control", "S_control",
+        # "Fe_control", "Mn_control", "Zn_control", "Cu_control", "B_control", "Mo_control",
+        # "solution_temp_control", "flow_rate_control", "aeration_control"
+
+
+        "pH", "EC", "solution_temp", "oxygen_level",
+        "total_macros", "total_micros", "N_ratio", "P_ratio", "K_ratio",
+        "air_temp", "humidity", "co2_level"
+
+
+
     ]
         #for module in self.observation_modules:
         #   obs_names.extend(module.obs_names)
@@ -828,6 +928,36 @@ class HydroponicLettuceEnv(GreenLightEnv):
         # مؤشر الأداء البيئي: عدد الانتهاكات في الخطوة الحالية
         return int(self._check_ph_violation() or self._check_ec_violation() or self._check_solution_temp_violation())
 
+    def _get_energy_price(self, hour: int) -> float:
+        """
+        Return electricity price ($/kWh) depending on time of day.
+        Example: higher in daytime, cheaper at night.
+        """
+        if 8 <= hour < 20:  # من 8 صباحًا لـ 8 مساءً
+            return 0.25     # غالي
+        else:
+            return 0.10     # رخيص
+        
+    def _calculate_energy_cost(self) -> float:
+        """
+        Calculate energy cost of lighting, heating, ventilation, etc.
+        Based on time-varying electricity price.
+        """
+        # افترض إن عندك counter للخطوة
+        hour = (self.current_step * self.time_step // 3600) % 24
+        energy_price = self._get_energy_price(hour)
+
+        # استهلاك (kWh) = مجموع الأجهزة * معدل استهلاك
+        lamp_power = self.controllers.get("lamp", 0.0) * 5.0      # kWh
+        heating_power = self.controllers.get("heating", 0.0) * 3.0
+        ventilation_power = self.controllers.get("ventilation", 0.0) * 2.0
+
+        total_kwh = lamp_power + heating_power + ventilation_power
+
+        return total_kwh * energy_price
+
+    
+    
     def _calculate_revenue(self):
         # الإيرادات = الكتلة الحيوية المنتجة * سعر البيع
         biomass = self._calculate_biomass()
@@ -890,7 +1020,7 @@ class HydroponicLettuceEnv(GreenLightEnv):
         """تحقق هل درجة حرارة المحلول خارج الحدود المسموحة"""
         temp_min = self.constraints_low[5] if hasattr(self, "constraints_low") else 18.0
         temp_max = self.constraints_high[5] if hasattr(self, "constraints_high") else 24.0
-        return self.solution_temperature < temp_min or self.solution_temperature > temp_max
+        return self.solution_temp < temp_min or self.solution_temp > temp_max
 
     def _check_nutrient_deficiency(self) -> bool:
         """
@@ -977,42 +1107,94 @@ class HydroponicLettuceEnv(GreenLightEnv):
         growth_rate = 0.05  # kg/day لكل نبات (افتراضي)
         return days * growth_rate
 
+
     def _calculate_reward(self) -> float:
         """
-        حساب المكافأة للخطوة الحالية.
-        - الإيرادات من بيع المحصول
-        - ناقص التكاليف (ثابتة + متغيرة)
-        - ناقص العقوبات لو في violations
+        Multi-objective reward (normalized):
+        1. Productivity (biomass ↑)
+        2. Efficiency (costs ↓)
+        3. Sustainability (violations ↓, proportional to deviation)
         """
 
-        # ✅ الإيرادات
+        # ✅ Productivity
+        biomass = self._calculate_biomass()
         revenue = self._calculate_revenue()
+        productivity_score = biomass  
 
-        # ✅ التكاليف
-        variable_costs = self._calculate_variable_costs()
-        fixed_costs = self._calculate_fixed_costs()
-        total_costs = variable_costs + fixed_costs
+        # ✅ Efficiency (Costs including energy)
+        total_costs = self._calculate_total_costs()
+        energy_cost = self._calculate_energy_cost()
+        efficiency_score = -(total_costs + energy_cost)
 
-        # ✅ العقوبات (violations penalties)
-        penalties = 0.0
+        # ✅ Sustainability (proportional penalties)
+        sustainability_penalty = 0.0
 
-        if self._check_ph_violation():
-            penalties += self.reward_params.get("ph_violation_penalty", 0.1)
-        if self._check_ec_violation():
-            penalties += self.reward_params.get("ec_violation_penalty", 0.1)
-        if self._check_solution_temp_violation():
-            penalties += self.reward_params.get("solution_temp_violation_penalty", 0.1)
-        if self._check_co2_violation():
-            penalties += self.reward_params.get("pen_weights", [0.001])[0]
-        if self._check_rh_violation():
-            penalties += self.reward_params.get("pen_weights", [0.0, 0.001])[1]
-        if self._check_temp_violation():
-            penalties += self.reward_params.get("pen_weights", [0.0, 0.0, 0.001])[2]
+        # pH deviation
+        ph_min = self.constraints_low[3] if hasattr(self, "constraints_low") else 5.5
+        ph_max = self.constraints_high[3] if hasattr(self, "constraints_high") else 6.5
+        if self.current_ph < ph_min:
+            sustainability_penalty += (ph_min - self.current_ph)
+        elif self.current_ph > ph_max:
+            sustainability_penalty += (self.current_ph - ph_max)
 
-        # ✅ المكافأة = الإيرادات - التكاليف - العقوبات
-        reward = revenue - total_costs - penalties
+        # EC deviation
+        ec_min = self.constraints_low[4] if hasattr(self, "constraints_low") else 1.2
+        ec_max = self.constraints_high[4] if hasattr(self, "constraints_high") else 2.2
+        if self.current_ec < ec_min:
+            sustainability_penalty += (ec_min - self.current_ec)
+        elif self.current_ec > ec_max:
+            sustainability_penalty += (self.current_ec - ec_max)
+
+        # Solution temperature deviation
+        temp_min = self.constraints_low[5] if hasattr(self, "constraints_low") else 18.0
+        temp_max = self.constraints_high[5] if hasattr(self, "constraints_high") else 24.0
+        if self.solution_temp < temp_min:
+            sustainability_penalty += (temp_min - self.solution_temp)
+        elif self.solution_temp > temp_max:
+            sustainability_penalty += (self.solution_temp - temp_max)
+
+        # CO2 deviation
+        co2 = getattr(self, "co2", 400.0)
+        co2_min = self.constraints.get("co2_min", 300.0)
+        co2_max = self.constraints.get("co2_max", 1300.0)
+        if co2 < co2_min:
+            sustainability_penalty += (co2_min - co2) / 100.0
+        elif co2 > co2_max:
+            sustainability_penalty += (co2 - co2_max) / 100.0
+
+        # RH deviation
+        rh = getattr(self, "rh", 60.0)
+        rh_min = self.constraints.get("rh_min", 50.0)
+        rh_max = self.constraints.get("rh_max", 85.0)
+        if rh < rh_min:
+            sustainability_penalty += (rh_min - rh) / 10.0
+        elif rh > rh_max:
+            sustainability_penalty += (rh - rh_max) / 10.0
+
+        sustainability_score = -sustainability_penalty
+
+        # ✅ Normalization factors (عشان الأوزان تكون عادلة)
+        max_biomass = self.reward_params.get("max_biomass", 5.0)       # kg per plant
+        max_costs = self.reward_params.get("max_costs", 100.0)         # $
+        max_penalty = self.reward_params.get("max_penalty", 10.0)      # arbitrary
+
+        productivity_norm = productivity_score / (1.0 + max_biomass)
+        efficiency_norm   = efficiency_score / (1.0 + max_costs)
+        sustainability_norm = sustainability_score / (1.0 + max_penalty)
+
+        # ✅ Combine with weights
+        w_prod = self.reward_params.get("w_productivity", 0.5)
+        w_eff  = self.reward_params.get("w_efficiency", 0.3)
+        w_sust = self.reward_params.get("w_sustainability", 0.2)
+
+        reward = (
+            w_prod * productivity_norm +
+            w_eff  * efficiency_norm +
+            w_sust * sustainability_norm
+        )
 
         return reward
+
 
     def _check_termination(self) -> bool:
         """
